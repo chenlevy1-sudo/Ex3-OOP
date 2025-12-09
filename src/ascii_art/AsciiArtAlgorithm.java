@@ -14,7 +14,7 @@ public class AsciiArtAlgorithm {
 
     // configuration state - Shell
     private Image image;
-    private int resolution = 64;  // TODO: take it from user
+    private int resolution;  // TODO: take it from user
     private boolean reverse;
     private AsciiOutput output;
 
@@ -23,7 +23,23 @@ public class AsciiArtAlgorithm {
     private final ImageSplitter splitter = new ImageSplitter();
     private final SubImgCharMatcher matcher;
 
-    //
+    // constants todo: think what to do with this
+    char[] DEAFULT_CHAR_SET = new char[10];
+
+    /**
+     * Creates a new ASCII-art algorithm with an initial image, output target,
+     * and character set to use for brightness matching.
+     *
+     * @param image the source image to convert
+     * @param charset the set of characters used for matching brightness
+     * @param resolution how many chars in a line
+     */
+    public AsciiArtAlgorithm(Image image, char[] charset, int resolution) {
+        this.image = image;                               // store image for later runs
+        this.matcher = new SubImgCharMatcher(charset);    // initialize brightness-to-char matcher (final)
+        this.resolution = resolution;
+    }
+
 
 
     /**
@@ -78,8 +94,8 @@ public class AsciiArtAlgorithm {
      */
     private double computeSubImageBrightness(Image image) {
         ImageBrightnessCalculator calculator =
-                new ImageBrightnessCalculator(image);      // use helper to convert to grayscale and average
-        return calculator.getAverageBrightness();            // average brightness of all pixels in sub-image
+                new ImageBrightnessCalculator(image);  // use helper to convert to grayscale and average
+        return calculator.getAverageBrightness();  // average brightness of all pixels in sub-image
     }
 
 }
