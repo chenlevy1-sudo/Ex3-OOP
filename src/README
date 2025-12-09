@@ -1,0 +1,51 @@
+------------- ImagePadder (in package image) -----------------
+
+The ImagePadder class is a stateless utility responsible for performing step 1.4.2.1 of the assignment —
+padding an input image so that both its width and height become powers of two.
+Padding rules:
+Padding is added using white pixels.
+Padding is distributed symmetrically between opposite sides whenever possible.
+Each dimension is padded independently to the smallest power of two greater than or equal to the original value.
+If no padding is required, the original image is returned unchanged.
+Public API:
+Image pad(Image source)
+Input:
+An Image instance representing the original bitmap.
+Output:
+A new Image whose dimensions are powers of two and which contains the original image centered inside a white background.
+Design notes:
+The class is stateless (no fields), following OOP principles and Single-Responsibility.
+Image construction uses the provided constructor Image(Color[][] pixelArray, int width, int height).
+
+
+
+------------- ImageSlitter (in package image) -----------------
+
+The ImageSplitter class is a stateless utility responsible for step 1.4.2.2 of the assignment:
+splitting a padded input image into equal square sub-images according to a given resolution.
+
+The resolution parameter represents the number of sub-images (characters) in each row of the final ASCII output.
+Since the padded image width is guaranteed to be divisible by this value, the splitter computes:
+
+the pixel side length of each square block:
+blockSize = paddedImageWidth / resolution
+
+the number of block rows:
+numRows = paddedImageHeight / blockSize
+
+the number of block columns:
+numCols = resolution
+
+The public API:
+
+Image[][] split(int resolution, Image imageToSplit)
+
+
+The method returns a 2D array of Image objects.
+Each element is a square sub-image of size blockSize × blockSize,
+and the 2D structure preserves the spatial layout of the original image (rows and columns).
+This layout is required in the next stage, where each sub-image is converted into a single ASCII character.
+
+The class contains private helper methods for extracting each block,
+keeping the public interface clean and aligned with the Single Responsibility Principle.
+It stores no internal state and does not modify the input image.
