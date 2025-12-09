@@ -49,3 +49,22 @@ This layout is required in the next stage, where each sub-image is converted int
 The class contains private helper methods for extracting each block,
 keeping the public interface clean and aligned with the Single Responsibility Principle.
 It stores no internal state and does not modify the input image.
+
+
+
+
+------------------------ AsciiArtAlgorithm (in package ascii_art) ----------------------------
+
+AsciiArtAlgorithm design
+The AsciiArtAlgorithm class is responsible for running a single ASCII-art conversion,
+given an Image, a resolution, a charset, and a reverse flag.
+The algorithm pads the image to powers of two using ImagePadder,
+then splits the padded image into square sub-images using ImageSplitter.
+For each sub-image it computes the average brightness with ImageBrightnessCalculator
+(using the same luminance formula everywhere),
+and then asks SubImgCharMatcher to choose the character whose normalized brightness is closest to the
+(possibly reversed) value.
+The result is a char[][] matrix which the Shell later passes to the selected AsciiOutput.
+This design follows composition: the algorithm delegates padding, splitting, brightness calculation,
+and character matching to dedicated helper classes,
+which keeps each class focused and makes the code easy to extend without modifying existing components.
