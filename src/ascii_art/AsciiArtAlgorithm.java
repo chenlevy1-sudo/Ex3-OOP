@@ -7,9 +7,7 @@ import image.ImagePadder;
 import image.ImageSplitter;
 import image_char_matching.SubImgCharMatcher;
 
-/**
- * TODO: ASCII art conversion algorithm implementation.
- */
+
 public class AsciiArtAlgorithm {
 
     // configuration state - Shell
@@ -41,7 +39,6 @@ public class AsciiArtAlgorithm {
     }
 
 
-
     /**
      * Runs the ASCII-art transformation with the current configuration.
      *
@@ -60,24 +57,24 @@ public class AsciiArtAlgorithm {
         char[][] asciiImage = new char[numRows][numCols];
 
         // 4) for each sub-image: compute brightness, find best matching char, and store it
-        for (int row = 0; row < numRows; row++) {               // iterate over sub-image rows
-            for (int col = 0; col < numCols; col++) {           // iterate over sub-image columns
+        for (int row = 0; row < numRows; row++) {
+            for (int col = 0; col < numCols; col++) {
 
-                Image currSubImage = subImages[row][col];           // current square block of the padded image
+                Image currSubImage = subImages[row][col];
 
                 // 4.1) compute average brightness of this sub-image
-                double currBrightness = computeSubImageBrightness(currSubImage); // normal mode brightness
+                double currBrightness = computeSubImageBrightness(currSubImage);
 
                 // 4.2) if reverse mode is on, use the complementary brightness todo: complete revers
-                if (reverse) {                                  // reverse == true means "invert" brightness mapping
-                    currBrightness = 1.0 - currBrightness;              // complementary brightness in [0.0, 1.0]
+                if (reverse) {
+                    currBrightness = 1.0 - currBrightness;
                 }
 
                 // 4.3) ask the matcher for the character whose normalized brightness is closest to our value
-                char matchingChar = matcher.getCharByImageBrightness(currBrightness); // nearest ASCII char by brightness
+                char matchingChar = matcher.getCharByImageBrightness(currBrightness);
 
                 // 4.4) store the chosen character in the result matrix
-                asciiImage[row][col] = matchingChar;            // this char represents the current sub-image
+                asciiImage[row][col] = matchingChar;
             }
         }
         return asciiImage;
@@ -94,8 +91,7 @@ public class AsciiArtAlgorithm {
      */
     private double computeSubImageBrightness(Image image) {
         ImageBrightnessCalculator calculator =
-                new ImageBrightnessCalculator(image);  // use helper to convert to grayscale and average
-        return calculator.getAverageBrightness();  // average brightness of all pixels in sub-image
+                new ImageBrightnessCalculator(image);
+        return calculator.getAverageBrightness();
     }
-
 }
