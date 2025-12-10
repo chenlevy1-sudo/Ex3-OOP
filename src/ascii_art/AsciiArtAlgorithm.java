@@ -11,7 +11,7 @@ public class AsciiArtAlgorithm {
 
     // configuration state - Shell
     private final Image image;
-    private final int resolution;  // TODO: take it from user
+    private final int resolution;  // how many chars in a line
     private boolean reverse;
     private AsciiOutput output;
 
@@ -34,25 +34,28 @@ public class AsciiArtAlgorithm {
      * @param resolution how many chars in a line
      */
     public AsciiArtAlgorithm(Image image, char[] charset, int resolution) {
-        this(image, new SubImgCharMatcher(charset), resolution);
+        this(image, new SubImgCharMatcher(charset), resolution, false);
     }
 
     /**
-     * Creates a new ASCII-art algorithm with an initial image, resolution,
-     * and an already configured {@link SubImgCharMatcher}.
+     * Package-private constructor used by the Shell.
      * <p>
-     * This constructor is convenient for the {@link ascii_art.Shell}, which
-     * can hold a single matcher instance and reuse it between runs.
+     * Allows passing a shared matcher and an explicit reverse flag while
+     * keeping the public API unchanged.
      *
      * @param image      the source image to convert
      * @param matcher    character matcher to use
      * @param resolution how many chars in a line
+     * @param reverse    whether to run in reverse mode
      */
-    public AsciiArtAlgorithm(Image image, SubImgCharMatcher matcher, int resolution) {
+    AsciiArtAlgorithm(Image image,
+                      SubImgCharMatcher matcher,
+                      int resolution,
+                      boolean reverse) {
         this.image = image;
         this.resolution = resolution;
-        this.reverse = false;
         this.matcher = matcher;
+        this.reverse = reverse;
     }
 
     /**

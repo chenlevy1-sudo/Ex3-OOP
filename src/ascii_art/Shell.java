@@ -26,53 +26,19 @@ import java.util.TreeSet;
  */
 public class Shell {
 
-    /**
-     * Current charset – always sorted by ASCII value.
-     */
     private final SortedSet<Character> chars;
-
-    /**
-     * Matcher that holds brightness information for the current charset.
-     * Shared between all runs of the algorithm to avoid redundant
-     * recomputation.
-     */
     private final SubImgCharMatcher matcher;
 
-    /**
-     * Current resolution (number of characters per row).
-     */
     private int resolution = 2;
-
-    /**
-     * Current image used for ASCII-art generation.
-     */
     private Image image;
-
-    /**
-     * Cached width of the image, used for resolution boundaries.
-     */
     private int imgWidth;
-
-    /**
-     * Cached height of the image, used for resolution boundaries.
-     */
     private int imgHeight;
 
-    /**
-     * Reverse mode flag (behavior not defined yet).
-     */
     private boolean reverse = false;
-
-    /**
-     * Current output target (console / html).
-     */
     private AsciiOutput output = new ConsoleAsciiOutput();
 
     /**
      * Constructs a new shell with a default charset of digits '0'–'9'.
-     * <p>
-     * Both the sorted charset and the {@link SubImgCharMatcher} are
-     * initialized to contain these digits.
      */
     public Shell() {
         this.chars = new TreeSet<>();
@@ -85,9 +51,6 @@ public class Shell {
 
     /**
      * Starts the shell session on the given image file.
-     * <p>
-     * If loading the image fails, the method returns immediately, as
-     * required by the assignment.
      *
      * @param imageName path to the image file
      */
@@ -97,7 +60,6 @@ public class Shell {
             imgWidth = image.getWidth();
             imgHeight = image.getHeight();
         } catch (IOException e) {
-            // If there is a problem with the image – just terminate.
             return;
         }
 
@@ -106,8 +68,6 @@ public class Shell {
 
     /**
      * Main loop that reads and handles user commands.
-     * <p>
-     * The loop terminates only when the user types {@code exit}.
      */
     private void userInputLoop() {
         while (true) {
@@ -121,7 +81,7 @@ public class Shell {
             String cmd = parts[0];
 
             if (cmd.equals("exit")) {
-                return;  // must not print anything after this
+                return;
             } else if (cmd.equals("chars")) {
                 handleChars();
             } else if (cmd.equals("add")) {
@@ -143,9 +103,8 @@ public class Shell {
     /**
      * Handles the {@code asciiArt} command.
      * <p>
-     * Creates a <b>new</b> {@link AsciiArtAlgorithm} instance for this run,
-     * but reuses the shared {@link SubImgCharMatcher} so that character
-     * brightness information is reused between runs.
+     * Creates a new {@link AsciiArtAlgorithm} instance for this run,
+     * passes the shared matcher and the current reverse flag.
      */
     private void handleAsciiArt() {
         if (chars.size() < 2) {
@@ -153,8 +112,9 @@ public class Shell {
             return;
         }
 
-        // 1) create a NEW algorithm instance for this run
-        AsciiArtAlgorithm algo = new AsciiArtAlgorithm(image, matcher, resolution);
+        // 1) create a NEW algorithm instance for this run, with shared matcher and reverse flag
+        AsciiArtAlgorithm algo =
+                new AsciiArtAlgorithm(image, matcher, resolution, reverse);
 
         // 2) run the algorithm
         char[][] art = algo.run();
@@ -164,8 +124,7 @@ public class Shell {
     }
 
     /**
-     * Handles the {@code chars} command – prints the current charset
-     * as a sorted sequence of characters on a single line.
+     * Handles the {@code chars} command – prints the current charset.
      */
     private void handleChars() {
         for (char c : chars) {
@@ -176,17 +135,6 @@ public class Shell {
 
     /**
      * Handles the {@code add} command.
-     * <p>
-     * Supported formats:
-     * <ul>
-     *     <li>{@code add all}</li>
-     *     <li>{@code add space}</li>
-     *     <li>{@code add X}</li>
-     *     <li>{@code add A-Z}</li>
-     * </ul>
-     * Whenever characters are added to {@link #chars}, they are also
-     * added to {@link #matcher} so that brightness information stays
-     * synchronized.
      *
      * @param parts tokenized user input
      */
@@ -196,7 +144,7 @@ public class Shell {
             return;
         }
 
-        String arg = parts[1]; // we may ignore the rest of the input
+        String arg = parts[1];
 
         if (arg.equals("all")) {
             addRange((char) 32, (char) 126);
@@ -231,9 +179,6 @@ public class Shell {
 
     /**
      * Checks whether a character is in the legal ASCII range [32, 126].
-     *
-     * @param c the character to check
-     * @return {@code true} if the character is legal, {@code false} otherwise
      */
     private boolean isLegalAscii(char c) {
         int v = (int) c;
@@ -243,9 +188,6 @@ public class Shell {
     /**
      * Adds all characters in the inclusive range [from, to] both to the
      * sorted charset and to the matcher.
-     *
-     * @param from start of the range (inclusive)
-     * @param to   end of the range (inclusive)
      */
     private void addRange(char from, char to) {
         for (char c = from; c <= to; c++) {
@@ -256,16 +198,6 @@ public class Shell {
 
     /**
      * Handles the {@code remove} command.
-     * <p>
-     * Supported formats:
-     * <ul>
-     *     <li>{@code remove all}</li>
-     *     <li>{@code remove space}</li>
-     *     <li>{@code remove X}</li>
-     *     <li>{@code remove A-Z}</li>
-     * </ul>
-     * Whenever characters are removed from {@link #chars}, they are also
-     * removed from {@link #matcher}.
      *
      * @param parts tokenized user input
      */
@@ -311,15 +243,6 @@ public class Shell {
 
     /**
      * Handles the {@code res} command.
-     * <p>
-     * Supported formats:
-     * <ul>
-     *     <li>{@code res}</li>
-     *     <li>{@code res up}</li>
-     *     <li>{@code res down}</li>
-     * </ul>
-     * The resolution is kept within the boundaries derived from the
-     * current image size.
      *
      * @param parts tokenized user input
      */
@@ -353,18 +276,15 @@ public class Shell {
     }
 
     /**
-     * Handles the {@code reverse} command – currently only toggles
-     * the internal flag, without affecting the algorithm.
-     *
-     * @param parts tokenized user input (ignored)
+     * Handles the {@code reverse} command – toggles the reverse mode flag.
+     * The flag will be used on the next {@code asciiArt} run.
      */
     private void handleReverse(String[] parts) {
-        reverse = !reverse;   // toggle: false→true, true→false
+        reverse = !reverse;
     }
 
     /**
-     * Handles the {@code output} command – selects the output target:
-     * console or HTML.
+     * Handles the {@code output} command – selects the output target.
      *
      * @param parts tokenized user input
      */
@@ -388,8 +308,6 @@ public class Shell {
     /**
      * Program entry point. Expects a single argument: the path to the
      * image file.
-     *
-     * @param args command-line arguments
      */
     public static void main(String[] args) {
         if (args.length < 1) {
