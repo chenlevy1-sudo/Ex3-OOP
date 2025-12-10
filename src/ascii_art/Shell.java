@@ -46,13 +46,14 @@ public class Shell {
     private static final String ARG_HTML = "html";
     private static final String DEFAULT_FONT = "Courier New";
     private static final String DEFAULT_OUT_FILE_NAME = "out.html";
+    private static final String CMD_UP = "up";
+    private static final String CMD_DOWN = "down";
     private static final Character CHAR_SPACE = ' ';
     private static final int RANGE_EXPRESSION_LENGTH = 3;
     private static final int RANGE_START_INDEX = 0;
     private static final int RANGE_SEPARATOR_INDEX = 1;
     private static final int RANGE_END_INDEX = 2;
     private static final char RANGE_SEPARATOR = '-';
-
 
 
     private final SortedSet<Character> chars;
@@ -209,9 +210,9 @@ public class Shell {
             } else {
                 System.out.println("Did not add due to incorrect format.");
             }
-        } else if (arg.length() == RANGE_EXPRESSION_LENGTH && arg.charAt(1) == '-') {
-            char c1 = arg.charAt(0);
-            char c2 = arg.charAt(2);
+        } else if (arg.length() == RANGE_EXPRESSION_LENGTH && arg.charAt(RANGE_SEPARATOR_INDEX) == '-') {
+            char c1 = arg.charAt(RANGE_START_INDEX);
+            char c2 = arg.charAt(RANGE_END_INDEX);
 
             if (!isLegalAscii(c1) || !isLegalAscii(c2)) {
                 System.out.println("Did not add due to incorrect format.");
@@ -252,12 +253,12 @@ public class Shell {
      * @param parts tokenized user input
      */
     private void handleRemove(String[] parts) {
-        if (parts.length < 2) {
+        if (parts.length < RANGE_END_INDEX) {
             System.out.println("Did not remove due to incorrect format.");
             return;
         }
 
-        String arg = parts[1];
+        String arg = parts[RANGE_SEPARATOR_INDEX];
 
         if (arg.equals(ARG_ALL)) {
             for (char c : chars) {
@@ -267,17 +268,17 @@ public class Shell {
         } else if (arg.equals(ARG_SPACE)) {
             chars.remove(' ');
             matcher.removeChar(' ');
-        } else if (arg.length() == 1) {
-            char c = arg.charAt(0);
+        } else if (arg.length() == RANGE_SEPARATOR_INDEX) {
+            char c = arg.charAt(RANGE_START_INDEX);
             if (isLegalAscii(c)) {
                 chars.remove(c);
                 matcher.removeChar(c);
             } else {
                 System.out.println("Did not remove due to incorrect format.");
             }
-        } else if (arg.length() == 3 && arg.charAt(1) == '-') {
-            char from = arg.charAt(0);
-            char to = arg.charAt(2);
+        } else if (arg.length() == RANGE_EXPRESSION_LENGTH && arg.charAt(RANGE_SEPARATOR_INDEX) == RANGE_SEPARATOR) {
+            char from = arg.charAt(RANGE_START_INDEX);
+            char to = arg.charAt(RANGE_END_INDEX);
             if (isLegalAscii(from) && isLegalAscii(to) && from <= to) {
                 for (char c = from; c <= to; c++) {
                     chars.remove(c);
@@ -297,17 +298,17 @@ public class Shell {
      * @param parts tokenized user input
      */
     private void handleRes(String[] parts) {
-        if (parts.length == 1) {
+        if (parts.length == RANGE_SEPARATOR_INDEX) {
             System.out.println("Resolution set to " + resolution + ".");
             return;
         }
 
-        String arg = parts[1];
+        String arg = parts[RANGE_SEPARATOR_INDEX];
 
         int newRes;
-        if (arg.equals("up")) {
+        if (arg.equals(CMD_UP)) {
             newRes = resolution * 2;
-        } else if (arg.equals("down")) {
+        } else if (arg.equals(CMD_DOWN)) {
             newRes = resolution / 2;
         } else {
             System.out.println("Did not change resolution due to incorrect format.");
@@ -344,7 +345,7 @@ public class Shell {
             return;
         }
 
-        String arg = parts[1];
+        String arg = parts[RANGE_SEPARATOR_INDEX];
 
         if (arg.equals(ARG_CONSOLE)) {
             output = new ConsoleAsciiOutput();
@@ -360,10 +361,10 @@ public class Shell {
      * image file.
      */
     public static void main(String[] args) {
-        if (args.length < 1) {
+        if (args.length < RANGE_SEPARATOR_INDEX) {
             return;
         }
         Shell shell = new Shell();
-        shell.run(args[0]);
+        shell.run(args[RANGE_START_INDEX]);
     }
 }
