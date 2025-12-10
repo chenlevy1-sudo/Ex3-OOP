@@ -68,3 +68,42 @@ The result is a char[][] matrix which the Shell later passes to the selected Asc
 This design follows composition: the algorithm delegates padding, splitting, brightness calculation,
 and character matching to dedicated helper classes,
 which keeps each class focused and makes the code easy to extend without modifying existing components.
+
+
+
+----------------------------------------- Caching and efficiency considerations -----------------------------------
+
+To avoid repeated computations, we added several small caching layers on top of the basic algorithm.
+First, in AsciiArtAlgorithm we maintain a static cache of the brightness grid for the last
+(image, resolution) pair that was processed.
+The helper method getSubImageBrightnessGrid() pads and splits the image and
+computes the average brightness of every sub-image only on the first run.
+Subsequent runs with the same image and resolution
+(for example, when only the charset or the reverse flag change) reuse this double[][]
+instead of recomputing all brightness values.
+This reduces the asymptotic running time of repeated runs from Θ(#pixels) to Θ(#subImages · |charset|),
+at the cost of storing one additional double[][] in memory.
+Second, in CharRawBrightness we use a global static HashMap<Character, Double> as a cache for raw character brightness.
+For every new character we compute its boolean bitmap and brightness at most once;
+all future SubImgCharMatcher instances reuse the cached value.
+This removes an unnecessary Θ(pixelsPerChar) factor from later runs and keeps memory usage linear
+in the number of distinct characters that were ever used.
+Finally, we reuse a single SubImgCharMatcher instance across all runs in the Shell.
+The matcher internally stores both raw and normalized brightness values in maps.
+Normalization is performed only when the charset actually changes (on addChar / removeChar),
+and not on every call to the algorithm.
+This design satisfies the efficiency requirements of section 1.5 while keeping
+the code modular and adhering to the given API.
+
+
+
+
+----------------------------------- Shell and caching usage --------------------------------------
+
+The Shell class holds a single SubImgCharMatcher instance as a field and reuses it across all asciiArt runs.
+For every asciiArt command the shell creates a new AsciiArtAlgorithm object,
+passing the shared matcher and the current resolution.
+This design respects the requirement that a fresh algorithm instance is created on each run,
+while still allowing the internal caching mechanisms to be effective:
+the matcher keeps its raw and normalized brightness maps between runs,
+and the algorithm can reuse the cached sub-image brightness grid for the current image and resolution.

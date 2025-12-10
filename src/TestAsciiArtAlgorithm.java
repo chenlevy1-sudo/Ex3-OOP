@@ -1,8 +1,8 @@
-import ascii_art.AsciiArtAlgorithm;          // uses the ASCII-art algorithm implementation
-import ascii_output.AsciiOutput;             // common interface for all ASCII outputs
-import ascii_output.ConsoleAsciiOutput;      // prints ASCII-art directly to the console
-import ascii_output.HtmlAsciiOutput;         // writes ASCII-art into an HTML file
-import image.Image;                          // wrapper for image pixel data used in the assignment
+import ascii_art.AsciiArtAlgorithm;
+import ascii_output.AsciiOutput;
+import ascii_output.ConsoleAsciiOutput;
+import ascii_output.HtmlAsciiOutput;
+import image.Image;
 
 /**
  * Manual test for {@link AsciiArtAlgorithm} using a real image file and both
@@ -21,7 +21,7 @@ public class TestAsciiArtAlgorithm {
     public static void main(String[] args) throws Exception {
 
         // 1) choose a real image file inside your project folder
-        String imagePath = "C:\\Users\\adipa\\IdeaProjects\\Ex3\\cat.jpeg";           // TODO: update to a real image path that exists
+        String imagePath = "C:\\Users\\adipa\\IdeaProjects\\Ex3\\cat.jpeg";
 
         // 2) load the image using the constructor provided by the assignment
         Image image = new Image(imagePath);            // loads the image file into an Image object
@@ -33,6 +33,10 @@ public class TestAsciiArtAlgorithm {
         }
         // build a charset containing ALL
         char[] fullAsciiCharset = buildFullAsciiCharset();        // use *all* printable ASCII chars
+
+        // build a charset containing 0123456789
+        char[] numericCharset = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+
 
         // 4) choose a resolution (number of sub-images per row)
         int resolution = 512;                           // TODO: you can change this (must be a valid resolution)

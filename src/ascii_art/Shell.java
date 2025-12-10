@@ -4,268 +4,398 @@ import ascii_output.AsciiOutput;
 import ascii_output.ConsoleAsciiOutput;
 import ascii_output.HtmlAsciiOutput;
 import image.Image;
+import image_char_matching.SubImgCharMatcher;
 
 import java.io.IOException;
-import java.util.*;
-
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
- * TODO: Shell for user commands and interaction.
+ * Interactive shell for user commands and interaction with the ASCII-art
+ * algorithm.
+ * <p>
+ * The shell:
+ * <ul>
+ *     <li>Maintains the current charset as a sorted set of characters.</li>
+ *     <li>Holds a single {@link SubImgCharMatcher} instance and keeps it
+ *     synchronized with the charset, so character brightness information
+ *     is reused between runs.</li>
+ *     <li>Creates a new {@link AsciiArtAlgorithm} instance on every
+ *     {@code asciiArt} command, as required.</li>
+ * </ul>
  */
 public class Shell {
-	// מאגר התווים – תמיד ממויין לפי ASCII
-	private final SortedSet<Character> chars;
 
-	// רזולוציה נוכחית (סעיף 2.6.5)
-	private int resolution = 2;
-	private Image image;
+    /**
+     * Current charset – always sorted by ASCII value.
+     */
+    private final SortedSet<Character> chars;
 
-	// נתוני התמונה – לצורך חישוב גבולות הרזולוציה
-	private int imgWidth;
-	private int imgHeight;
-	private boolean reverse = false;     // 2.7 – מצב reverse
-	private AsciiOutput output = new ConsoleAsciiOutput(); // 2.8 – ברירת מחדל console
+    /**
+     * Matcher that holds brightness information for the current charset.
+     * Shared between all runs of the algorithm to avoid redundant
+     * recomputation.
+     */
+    private final SubImgCharMatcher matcher;
 
-	public Shell() {
-		this.chars = new TreeSet<>();
-		// מאתחלים ברירת מחדל 0–9 (סעיף 2.3)
-		for (char c = '0'; c <= '9'; c++) {
-			chars.add(c);
-		}
-	}
+    /**
+     * Current resolution (number of characters per row).
+     */
+    private int resolution = 2;
 
+    /**
+     * Current image used for ASCII-art generation.
+     */
+    private Image image;
 
-	/* ====== לוגיקה ראשית ====== */
+    /**
+     * Cached width of the image, used for resolution boundaries.
+     */
+    private int imgWidth;
 
-	public void run(String imageName) {
-		// מנסים לטעון תמונה – אם יש בעיה, פשוט מסיימים (כמו בהוראות)
-		try {
-			this.image = new Image(imageName);
-			imgWidth = image.getWidth();
-			imgHeight = image.getHeight();
-		} catch (IOException e) {
-			// אם יש בעיה עם התמונה – פשוט מסיימים
-			return;
-		}
+    /**
+     * Cached height of the image, used for resolution boundaries.
+     */
+    private int imgHeight;
 
-		userInputLoop();
-	}
+    /**
+     * Reverse mode flag (behavior not defined yet).
+     */
+    private boolean reverse = false;
 
-	private void printChars(){
-		for (char c: chars){
-			System.out.print(c+" ");
-		}
-	}
+    /**
+     * Current output target (console / html).
+     */
+    private AsciiOutput output = new ConsoleAsciiOutput();
 
-	private void userInputLoop() {
-		while (true) {
-			System.out.print(">>> ");
-			String input = KeyboardInput.readLine();  // כבר עם trim
+    /**
+     * Constructs a new shell with a default charset of digits '0'–'9'.
+     * <p>
+     * Both the sorted charset and the {@link SubImgCharMatcher} are
+     * initialized to contain these digits.
+     */
+    public Shell() {
+        this.chars = new TreeSet<>();
+        for (char c = '0'; c <= '9'; c++) {
+            chars.add(c);
+        }
+        // 1) initialize matcher with default charset (digits)
+        this.matcher = new SubImgCharMatcher();
+    }
 
-			if (input.isEmpty()) {
-				continue;
-			}
-			String[] parts = input.split("\\s+");
-			String cmd = parts[0];
+    /**
+     * Starts the shell session on the given image file.
+     * <p>
+     * If loading the image fails, the method returns immediately, as
+     * required by the assignment.
+     *
+     * @param imageName path to the image file
+     */
+    public void run(String imageName) {
+        try {
+            this.image = new Image(imageName);
+            imgWidth = image.getWidth();
+            imgHeight = image.getHeight();
+        } catch (IOException e) {
+            // If there is a problem with the image – just terminate.
+            return;
+        }
 
-			if (cmd.equals("exit")) {
-				return;  // אסור להדפיס כלום אחרי
-			} else if (cmd.equals("chars")) {
-				handleChars();
-			} else if (cmd.equals("add")) {
-				handleAdd(parts);
-			} else if (cmd.equals("remove")) {
-				handleRemove(parts);
-			} else if (cmd.equals("res")) {
-				handleRes(parts);
-			} else if (cmd.equals("reverse")) {
-			    handleReverse(parts);
-		    } else if (cmd.equals("output")) {
-				handleOutput(parts);
-			}
-			else if (cmd.equals("asciiArt")) {
-				handleAsciiArt();
-			}
-			}
-		}
+        userInputLoop();
+    }
 
-	private void handleAsciiArt() {
-		if (chars.size() < 2) {
-			System.out.println("Did not execute. Charset is too small.");
-			return;
-		}
+    /**
+     * Main loop that reads and handles user commands.
+     * <p>
+     * The loop terminates only when the user types {@code exit}.
+     */
+    private void userInputLoop() {
+        while (true) {
+            System.out.print(">>> ");
+            String input = KeyboardInput.readLine();  // already trimmed
 
-		// 2. ממירים את SortedSet<Character> למערך char[]
-		char[] charset = new char[chars.size()];
-		int i = 0;
-		for (char c : chars) {
-			charset[i++] = c;
-		}
+            if (input.isEmpty()) {
+                continue;
+            }
+            String[] parts = input.split("\\s+");
+            String cmd = parts[0];
 
-		// 3. יוצרים את האלגוריתם עם התמונה, המאפיינים והרזולוציה הנוכחית
-		AsciiArtAlgorithm algo = new AsciiArtAlgorithm(image, charset, resolution);
-		//algo.setReverse(reverse);   // מצב reverse מה-Shell
+            if (cmd.equals("exit")) {
+                return;  // must not print anything after this
+            } else if (cmd.equals("chars")) {
+                handleChars();
+            } else if (cmd.equals("add")) {
+                handleAdd(parts);
+            } else if (cmd.equals("remove")) {
+                handleRemove(parts);
+            } else if (cmd.equals("res")) {
+                handleRes(parts);
+            } else if (cmd.equals("reverse")) {
+                handleReverse(parts);
+            } else if (cmd.equals("output")) {
+                handleOutput(parts);
+            } else if (cmd.equals("asciiArt")) {
+                handleAsciiArt();
+            }
+        }
+    }
 
-		// 4. מריצים את האלגוריתם
-		char[][] art = algo.run();
+    /**
+     * Handles the {@code asciiArt} command.
+     * <p>
+     * Creates a <b>new</b> {@link AsciiArtAlgorithm} instance for this run,
+     * but reuses the shared {@link SubImgCharMatcher} so that character
+     * brightness information is reused between runs.
+     */
+    private void handleAsciiArt() {
+        if (chars.size() < 2) {
+            System.out.println("Did not execute. Charset is too small.");
+            return;
+        }
 
-		// 5. שולחים לפלט שנבחר (console / html)
-		output.out(art);
-	}
-	/* ====== 2.3 – chars ====== */
+        // 1) create a NEW algorithm instance for this run
+        AsciiArtAlgorithm algo = new AsciiArtAlgorithm(image, matcher, resolution);
 
-	private void handleChars() {
-		for (char c : chars) {
-			System.out.print(c);
-		}
-		System.out.println();
-	}
+        // 2) run the algorithm
+        char[][] art = algo.run();
 
-	/* ====== 2.4 – add ====== */
+        // 3) send to the selected output (console / html)
+        output.out(art);
+    }
 
-	private void handleAdd(String[] parts) {
-		if (parts.length < 2) {
-			System.out.println("Did not add due to incorrect format.");
-			return;
-		}
+    /**
+     * Handles the {@code chars} command – prints the current charset
+     * as a sorted sequence of characters on a single line.
+     */
+    private void handleChars() {
+        for (char c : chars) {
+            System.out.print(c);
+        }
+        System.out.println();
+    }
 
-		String arg = parts[1]; // לפי ההוראות מותר להתעלם משאר הקלט אחרי זה
+    /**
+     * Handles the {@code add} command.
+     * <p>
+     * Supported formats:
+     * <ul>
+     *     <li>{@code add all}</li>
+     *     <li>{@code add space}</li>
+     *     <li>{@code add X}</li>
+     *     <li>{@code add A-Z}</li>
+     * </ul>
+     * Whenever characters are added to {@link #chars}, they are also
+     * added to {@link #matcher} so that brightness information stays
+     * synchronized.
+     *
+     * @param parts tokenized user input
+     */
+    private void handleAdd(String[] parts) {
+        if (parts.length < 2) {
+            System.out.println("Did not add due to incorrect format.");
+            return;
+        }
 
-		if (arg.equals("all")) {
-			addRange((char) 32, (char) 126);
-		} else if (arg.equals("space")) {
-			chars.add(' ');
-		} else if (arg.length() == 1) {
-			char c = arg.charAt(0);
-			if (isLegalAscii(c)) {
-				chars.add(c);
-			} else {
-				System.out.println("Did not add due to incorrect format.");
-			}
-		} else if (arg.length() == 3 && arg.charAt(1) == '-') {
-			char c1 = arg.charAt(0);
-			char c2 = arg.charAt(2);
+        String arg = parts[1]; // we may ignore the rest of the input
 
-			// קודם בודקים שהם בתחום ה־ASCII המותר
-			if (!isLegalAscii(c1) || !isLegalAscii(c2)) {
-				System.out.println("Did not add due to incorrect format.");
-				return;
-			}
+        if (arg.equals("all")) {
+            addRange((char) 32, (char) 126);
+        } else if (arg.equals("space")) {
+            chars.add(' ');
+            matcher.addChar(' ');
+        } else if (arg.length() == 1) {
+            char c = arg.charAt(0);
+            if (isLegalAscii(c)) {
+                chars.add(c);
+                matcher.addChar(c);
+            } else {
+                System.out.println("Did not add due to incorrect format.");
+            }
+        } else if (arg.length() == 3 && arg.charAt(1) == '-') {
+            char c1 = arg.charAt(0);
+            char c2 = arg.charAt(2);
 
-			// דואגים שהקטן יהיה start והגדול end – כך שגם "p-m" יעבוד
-			char start = (char) Math.min(c1, c2);
-			char end   = (char) Math.max(c1, c2);
+            if (!isLegalAscii(c1) || !isLegalAscii(c2)) {
+                System.out.println("Did not add due to incorrect format.");
+                return;
+            }
 
-			addRange(start, end);
-		} else {
-			System.out.println("Did not add due to incorrect format.");
-		}
-	}
+            char start = (char) Math.min(c1, c2);
+            char end   = (char) Math.max(c1, c2);
 
+            addRange(start, end);
+        } else {
+            System.out.println("Did not add due to incorrect format.");
+        }
+    }
 
-	private boolean isLegalAscii(char c) {
-		int v = (int) c;
-		return v >= 32 && v <= 126;
-	}
+    /**
+     * Checks whether a character is in the legal ASCII range [32, 126].
+     *
+     * @param c the character to check
+     * @return {@code true} if the character is legal, {@code false} otherwise
+     */
+    private boolean isLegalAscii(char c) {
+        int v = (int) c;
+        return v >= 32 && v <= 126;
+    }
 
-	private void addRange(char from, char to) {
-		for (char c = from; c <= to; c++) {
-			chars.add(c);
-		}
-	}
+    /**
+     * Adds all characters in the inclusive range [from, to] both to the
+     * sorted charset and to the matcher.
+     *
+     * @param from start of the range (inclusive)
+     * @param to   end of the range (inclusive)
+     */
+    private void addRange(char from, char to) {
+        for (char c = from; c <= to; c++) {
+            chars.add(c);
+            matcher.addChar(c);
+        }
+    }
 
-	/* ====== 2.5 – remove ====== */
+    /**
+     * Handles the {@code remove} command.
+     * <p>
+     * Supported formats:
+     * <ul>
+     *     <li>{@code remove all}</li>
+     *     <li>{@code remove space}</li>
+     *     <li>{@code remove X}</li>
+     *     <li>{@code remove A-Z}</li>
+     * </ul>
+     * Whenever characters are removed from {@link #chars}, they are also
+     * removed from {@link #matcher}.
+     *
+     * @param parts tokenized user input
+     */
+    private void handleRemove(String[] parts) {
+        if (parts.length < 2) {
+            System.out.println("Did not remove due to incorrect format.");
+            return;
+        }
 
-	private void handleRemove(String[] parts) {
-		if (parts.length < 2) {
-			System.out.println("Did not remove due to incorrect format.");
-			return;
-		}
+        String arg = parts[1];
 
-		String arg = parts[1];
+        if (arg.equals("all")) {
+            for (char c : chars) {
+                matcher.removeChar(c);
+            }
+            chars.clear();
+        } else if (arg.equals("space")) {
+            chars.remove(' ');
+            matcher.removeChar(' ');
+        } else if (arg.length() == 1) {
+            char c = arg.charAt(0);
+            if (isLegalAscii(c)) {
+                chars.remove(c);
+                matcher.removeChar(c);
+            } else {
+                System.out.println("Did not remove due to incorrect format.");
+            }
+        } else if (arg.length() == 3 && arg.charAt(1) == '-') {
+            char from = arg.charAt(0);
+            char to = arg.charAt(2);
+            if (isLegalAscii(from) && isLegalAscii(to) && from <= to) {
+                for (char c = from; c <= to; c++) {
+                    chars.remove(c);
+                    matcher.removeChar(c);
+                }
+            } else {
+                System.out.println("Did not remove due to incorrect format.");
+            }
+        } else {
+            System.out.println("Did not remove due to incorrect format.");
+        }
+    }
 
-		if (arg.equals("all")) {
-			chars.clear();
-		} else if (arg.equals("space")) {
-			chars.remove(' ');
-		} else if (arg.length() == 1) {
-			char c = arg.charAt(0);
-			if (isLegalAscii(c)) {
-				chars.remove(c);
-			} else {
-				System.out.println("Did not remove due to incorrect format.");
-			}
-		} else if (arg.length() == 3 && arg.charAt(1) == '-') {
-			char from = arg.charAt(0);
-			char to = arg.charAt(2);
-			if (isLegalAscii(from) && isLegalAscii(to) && from <= to) {
-				for (char c = from; c <= to; c++) {
-					chars.remove(c);
-				}
-			} else {
-				System.out.println("Did not remove due to incorrect format.");
-			}
-		} else {
-			System.out.println("Did not remove due to incorrect format.");
-		}
-	}
-	/* ====== 2.6 – res / res up / res down ====== */
+    /**
+     * Handles the {@code res} command.
+     * <p>
+     * Supported formats:
+     * <ul>
+     *     <li>{@code res}</li>
+     *     <li>{@code res up}</li>
+     *     <li>{@code res down}</li>
+     * </ul>
+     * The resolution is kept within the boundaries derived from the
+     * current image size.
+     *
+     * @param parts tokenized user input
+     */
+    private void handleRes(String[] parts) {
+        if (parts.length == 1) {
+            System.out.println("Resolution set to " + resolution + ".");
+            return;
+        }
 
-	private void handleRes(String[] parts) {
-		if (parts.length == 1) {
-			// 2.6.1 – רק מדפיסים, לא משנים
-			System.out.println("Resolution set to " + resolution + ".");
-			return;
-		}
+        String arg = parts[1];
 
-		String arg = parts[1];  // מתעלמים משאר הקלט אחרי זה
+        int newRes;
+        if (arg.equals("up")) {
+            newRes = resolution * 2;
+        } else if (arg.equals("down")) {
+            newRes = resolution / 2;
+        } else {
+            System.out.println("Did not change resolution due to incorrect format.");
+            return;
+        }
 
-		int newRes;
-		if (arg.equals("up")) {
-			newRes = resolution * 2;
-		} else if (arg.equals("down")) {
-			newRes = resolution / 2;
-		} else {
-			System.out.println("Did not change resolution due to incorrect format.");
-			return;
-		}
+        int minCharsInRow = Math.max(1, imgWidth / imgHeight);
+        int maxCharsInRow = imgWidth;
 
-		int minCharsInRow = Math.max(1, imgWidth / imgHeight);
-		int maxCharsInRow = imgWidth;
+        if (newRes < minCharsInRow || newRes > maxCharsInRow) {
+            System.out.println("Did not change resolution due to exceeding boundaries.");
+            return;
+        }
+        resolution = newRes;
+        System.out.println("Resolution set to " + resolution + ".");
+    }
 
-		if (newRes < minCharsInRow || newRes > maxCharsInRow) {
-			System.out.println("Did not change resolution due to exceeding boundaries.");
-			return;
-		}
-		resolution = newRes;
-		System.out.println("Resolution set to " + resolution + ".");
-	}
-	private void handleReverse (String[] parts){
-		reverse = !reverse;   // פשוט הופכים מצב: false→true, true→false
-	}
-	private void handleOutput(String[] parts) {
-		if (parts.length < 2) {
-			System.out.println("Did not change output method due to incorrect format.");
-			return;
-		}
+    /**
+     * Handles the {@code reverse} command – currently only toggles
+     * the internal flag, without affecting the algorithm.
+     *
+     * @param parts tokenized user input (ignored)
+     */
+    private void handleReverse(String[] parts) {
+        reverse = !reverse;   // toggle: false→true, true→false
+    }
 
-		String arg = parts[1];   // מותר להתעלם משאר הקלט לפי 2.8.4
+    /**
+     * Handles the {@code output} command – selects the output target:
+     * console or HTML.
+     *
+     * @param parts tokenized user input
+     */
+    private void handleOutput(String[] parts) {
+        if (parts.length < 2) {
+            System.out.println("Did not change output method due to incorrect format.");
+            return;
+        }
 
-		if (arg.equals("console")) {
-			output = new ConsoleAsciiOutput();
-		} else if (arg.equals("html")) {
-			output = new HtmlAsciiOutput("out.html", "Courier New");
-		} else {
-			System.out.println("Did not change output method due to incorrect format.");
-		}
-	}
+        String arg = parts[1];
 
+        if (arg.equals("console")) {
+            output = new ConsoleAsciiOutput();
+        } else if (arg.equals("html")) {
+            output = new HtmlAsciiOutput("out.html", "Courier New");
+        } else {
+            System.out.println("Did not change output method due to incorrect format.");
+        }
+    }
 
-
-	public static void main(String[] args) {
-        // TODO: implement according to instructions
-		Shell shell = new Shell();
-		shell.run(args[0]);
+    /**
+     * Program entry point. Expects a single argument: the path to the
+     * image file.
+     *
+     * @param args command-line arguments
+     */
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            return;
+        }
+        Shell shell = new Shell();
+        shell.run(args[0]);
     }
 }
-
