@@ -12,6 +12,8 @@ public class SubImgCharMatcher {
 	private Map<Character, Double> normalizedBrightnessMap;
 	private CharBrightness charBrightness;
 
+
+
 	public SubImgCharMatcher(char [] charset) {
 		charSet = new HashSet<Character>();
 		for (char ch : charset) {
