@@ -107,3 +107,111 @@ This design respects the requirement that a fresh algorithm instance is created 
 while still allowing the internal caching mechanisms to be effective:
 the matcher keeps its raw and normalized brightness maps between runs,
 and the algorithm can reuse the cached sub-image brightness grid for the current image and resolution.
+# README – ASCII Art Project
+
+### Student Information
+- CSE Username: <your_username>
+- ID number: <your_id>
+- Worked in a pair? No / Yes (Name, ID)
+
+---
+
+
+
+## 1. Class Structure (UML-Level Description)
+
+### ImagePadder (package `image`)
+Responsible for padding an image to the nearest power-of-two dimensions using symmetric white padding.
+Stateless utility performing step 1.4.2.1.
+
+### ImageSplitter (package `image`)
+Splits a padded image into square sub-images according to the given resolution.
+Stateless, used in step 1.4.2.2.
+
+### AsciiArtAlgorithm (package `ascii_art`)
+Coordinates the full ASCII-art process:
+- padding the image
+- splitting into sub-images
+- brightness calculation
+- selecting the closest character using `SubImgCharMatcher`
+Returns `char[][]` representing the ASCII result.
+Uses helper classes via composition.
+
+### SubImgCharMatcher (package `image_char_matching`)
+Stores and normalizes character brightness values.
+Used by the algorithm to find the best-matching character for each sub-image.
+
+### Shell (package `ascii_art`)
+Handles user interaction, command parsing, resolution changes, charset updates, output mode, and runs the algorithm.
+Stores one shared `SubImgCharMatcher` instance reused between runs.
+
+---
+
+## 2. Program Flow and Runtime Behavior
+
+During each `asciiArt` command:
+1. The Shell creates a new `AsciiArtAlgorithm` instance with:
+   - the current image
+   - the shared matcher
+   - the current resolution
+2. The algorithm:
+   - pads the image (`ImagePadder`)
+   - splits into sub-images (`ImageSplitter`)
+   - computes brightness values
+   - uses `SubImgCharMatcher` for character selection
+3. The resulting matrix is sent to the selected output (`ConsoleAsciiOutput` or `HtmlAsciiOutput`).
+
+### Efficiency
+- A brightness grid for `(image, resolution)` is cached inside `AsciiArtAlgorithm`.
+- `CharRawBrightness` caches raw brightness per character globally.
+- `SubImgCharMatcher` normalizes brightness only when the charset changes.
+This reduces repeated work and keeps time complexity low for consecutive runs.
+
+---
+
+## 3. Exception Handling
+
+I defined a checked exception `AsciiArtException` for all user-facing errors.
+
+Command methods (`handleAdd`, `handleRemove`, `handleRes`, `handleOutput`,
+`handleAsciiArt`, and unknown commands in `executeCommand`) **throw**
+`AsciiArtException` instead of printing errors.
+
+All exceptions are **caught only in** `userInputLoop`, which prints
+`e.getMessage()` and continues to the next command, ensuring the shell never exits due to invalid user input.
+
+Image loading failures (`IOException`) cause `run(String imageName)` to return immediately, as required.
+
+### Why exceptions?
+Using exceptions ensures:
+- separation between logic and UI
+- clean control flow (early exit on error)
+- centralized message printing
+- compliance with the assignment requirement to throw errors where they occur and catch them only once
+
+---
+
+## 4. Use of SubImgCharMatcher API
+
+The Shell holds a single shared `SubImgCharMatcher` instance.
+Whenever characters are added or removed from the charset (`add`/`remove` commands), the Shell calls:
+- `matcher.addChar(c)`
+- `matcher.removeChar(c)`
+
+This keeps the matcher synchronized with the charset and ensures brightness normalization happens only when needed.
+The same matcher is reused across all ASCII-art runs to avoid recomputing brightness data for previously added characters.
+
+---
+
+## 5. ASCII Output Components Usage
+
+We used the classes provided in the `ascii_output` package as-is:
+- `AsciiOutput`
+- `ConsoleAsciiOutput`
+- `HtmlAsciiOutput`
+
+No modifications were made.
+The Shell simply invokes their public method `out(char[][])` to print the ASCII-art result.
+
+---
+
