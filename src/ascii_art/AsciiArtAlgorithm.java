@@ -9,6 +9,10 @@ import image_char_matching.SubImgCharMatcher;
 
 public class AsciiArtAlgorithm {
 
+    // constants
+    private static final double MAX_BRIGHTNESS = 1.0;
+
+
     // configuration state - Shell
     private final Image image;
     private final int resolution;  // how many chars in a line
@@ -81,7 +85,7 @@ public class AsciiArtAlgorithm {
 
                 // 3.1) if reverse mode is on, use the complementary brightness
                 if (reverse) {
-                    currBrightness = 1.0 - currBrightness;
+                    currBrightness = MAX_BRIGHTNESS - currBrightness;
                 }
 
                 // 3.2) ask the matcher for the character whose normalized brightness is closest to our value
