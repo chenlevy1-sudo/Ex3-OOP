@@ -29,9 +29,12 @@ public class Shell {
 	private static final int DEFAULT_RESOLUTION = 2;
 	private static final char DEFAULT_CHARSET_START = '0';
 	private static final char DEFAULT_CHARSET_END = '9';
+	private static final String DEFAULT_FONT = "Courier New";
+	private static final String DEFAULT_OUT_FILE_NAME = "out.html";
 	private static final char MIN_PRINTABLE_ASCII = 32;
 	private static final char MAX_PRINTABLE_ASCII = 126;
 	private static final int MIN_CHARS_IN_ROW = 1;
+
 	private static final String CMD_EXIT = "exit";
 	private static final String CMD_CHARS = "chars";
 	private static final String CMD_ADD = "add";
@@ -40,18 +43,21 @@ public class Shell {
 	private static final String CMD_REVERSE = "reverse";
 	private static final String CMD_OUTPUT = "output";
 	private static final String CMD_ASCII_ART = "asciiArt";
+    private static final String CMD_UP = "up";
+    private static final String CMD_DOWN = "down";
+
 	private static final String ARG_ALL = "all";
 	private static final String ARG_SPACE = "space";
 	private static final String ARG_CONSOLE = "console";
 	private static final String ARG_HTML = "html";
-	private static final String DEFAULT_FONT = "Courier New";
-	private static final String DEFAULT_OUT_FILE_NAME = "out.html";
+
 	private static final Character CHAR_SPACE = ' ';
-	private static final int RANGE_EXPRESSION_LENGTH = 3;
 	private static final int RANGE_START_INDEX = 0;
 	private static final int RANGE_SEPARATOR_INDEX = 1;
 	private static final int RANGE_END_INDEX = 2;
+	private static final int RANGE_EXPRESSION_LENGTH = 3;
 	private static final char RANGE_SEPARATOR = '-';
+
 	private static final String ERR_ADD_INCORRECT_FORMAT =
 			"Did not add due to incorrect format.";
 	private static final String ERR_RES_INCORRECT_FORMAT =
@@ -60,8 +66,16 @@ public class Shell {
 			"Did not change resolution due to exceeding boundaries.";
 	private static final String ERR_OUTPUT_INCORRECT_FORMAT =
 			"Did not change output method due to incorrect format.";
+    private static final String ERR_REMOVE_INCORRECT_FORMAT =
+            "Did not remove due to incorrect format.";
+    private static final String ERR_INCORRECT_COMMAND =
+            "Did not execute due to incorrect command.";
+    private static final String ERR_CHARSET_TOO_SMALL =
+            "Did not execute. Charset is too small.";
+    private static final String MSG_RESOLUTION_SET =
+            "Resolution set to %d.";
 
-	private final SortedSet<Character> chars;
+    private final SortedSet<Character> chars;
 	private final SubImgCharMatcher matcher;
 
 	private int resolution = DEFAULT_RESOLUTION;
@@ -158,7 +172,7 @@ public class Shell {
 				break;
 
 			case CMD_REVERSE:
-				handleReverse(parts);
+				handleReverse();
 				break;
 
 			case CMD_OUTPUT:
@@ -171,7 +185,7 @@ public class Shell {
 
 			default:
 				// unknown command – considered an error by the assignment
-				throw new AsciiArtException("Did not execute due to incorrect command.");
+				throw new AsciiArtException(ERR_INCORRECT_COMMAND);
 		}
 
 		return false;
@@ -183,8 +197,8 @@ public class Shell {
 	 * @throws AsciiArtException if the charset is too small.
 	 */
 	private void handleAsciiArt() throws AsciiArtException {
-		if (chars.size() < 2) {
-			throw new AsciiArtException("Did not execute. Charset is too small.");
+		if (chars.size() < RANGE_END_INDEX) {
+			throw new AsciiArtException(ERR_CHARSET_TOO_SMALL);
 		}
 
 		AsciiArtAlgorithm algo =
@@ -211,7 +225,7 @@ public class Shell {
 	 * @throws AsciiArtException if the format is invalid.
 	 */
 	private void handleAdd(String[] parts) throws AsciiArtException {
-		if (parts.length < 2) {
+		if (parts.length < RANGE_END_INDEX) {
 			throw new AsciiArtException(ERR_ADD_INCORRECT_FORMAT);
 		}
 
@@ -275,8 +289,8 @@ public class Shell {
 	 * @throws AsciiArtException if the format is invalid.
 	 */
 	private void handleRemove(String[] parts) throws AsciiArtException {
-		if (parts.length < 2) {
-			throw new AsciiArtException("Did not remove due to incorrect format.");
+		if (parts.length < RANGE_END_INDEX) {
+			throw new AsciiArtException(ERR_REMOVE_INCORRECT_FORMAT);
 		}
 
 		String arg = parts[1];
@@ -295,7 +309,7 @@ public class Shell {
 				chars.remove(c);
 				matcher.removeChar(c);
 			} else {
-				throw new AsciiArtException("Did not remove due to incorrect format.");
+				throw new AsciiArtException(ERR_REMOVE_INCORRECT_FORMAT);
 			}
 		} else if (arg.length() == RANGE_EXPRESSION_LENGTH &&
 				arg.charAt(RANGE_SEPARATOR_INDEX) == RANGE_SEPARATOR) {
@@ -309,10 +323,10 @@ public class Shell {
 					matcher.removeChar(c);
 				}
 			} else {
-				throw new AsciiArtException("Did not remove due to incorrect format.");
+				throw new AsciiArtException(ERR_REMOVE_INCORRECT_FORMAT);
 			}
 		} else {
-			throw new AsciiArtException("Did not remove due to incorrect format.");
+			throw new AsciiArtException(ERR_REMOVE_INCORRECT_FORMAT);
 		}
 	}
 
@@ -324,16 +338,16 @@ public class Shell {
 	 */
 	private void handleRes(String[] parts) throws AsciiArtException {
 		if (parts.length == 1) {
-			System.out.println("Resolution set to " + resolution + ".");
+			System.out.println(String.format(MSG_RESOLUTION_SET, resolution));
 			return;
 		}
 
 		String arg = parts[1];
 
 		int newRes;
-		if (arg.equals("up")) {
+		if (arg.equals(CMD_UP)) {
 			newRes = resolution * 2;
-		} else if (arg.equals("down")) {
+		} else if (arg.equals(CMD_DOWN)) {
 			newRes = resolution / 2;
 		} else {
 			throw new AsciiArtException(ERR_RES_INCORRECT_FORMAT);
@@ -346,14 +360,14 @@ public class Shell {
 			throw new AsciiArtException(ERR_RES_BOUNDARIES);
 		}
 		resolution = newRes;
-		System.out.println("Resolution set to " + resolution + ".");
+		System.out.println(String.format(MSG_RESOLUTION_SET, resolution));
 	}
 
 	/**
 	 * Handles the {@code reverse} command – toggles the reverse mode flag.
 	 * The flag will be used on the next {@code asciiArt} run.
 	 */
-	private void handleReverse(String[] parts) {
+	private void handleReverse() {
 		reverse = !reverse;
 	}
 
@@ -364,7 +378,7 @@ public class Shell {
 	 * @throws AsciiArtException if the format is invalid.
 	 */
 	private void handleOutput(String[] parts) throws AsciiArtException {
-		if (parts.length < 2) {
+		if (parts.length < RANGE_END_INDEX) {
 			throw new AsciiArtException(ERR_OUTPUT_INCORRECT_FORMAT);
 		}
 

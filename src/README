@@ -1,217 +1,253 @@
-------------- ImagePadder (in package image) -----------------
+adipartosh0811,chen.levy1234
+206916595,206619025
 
-The ImagePadder class is a stateless utility responsible for performing step 1.4.2.1 of the assignment —
-padding an input image so that both its width and height become powers of two.
-Padding rules:
-Padding is added using white pixels.
-Padding is distributed symmetrically between opposite sides whenever possible.
-Each dimension is padded independently to the smallest power of two greater than or equal to the original value.
-If no padding is required, the original image is returned unchanged.
-Public API:
-Image pad(Image source)
-Input:
-An Image instance representing the original bitmap.
-Output:
-A new Image whose dimensions are powers of two and which contains the original image centered inside a white background.
-Design notes:
-The class is stateless (no fields), following OOP principles and Single-Responsibility.
-Image construction uses the provided constructor Image(Color[][] pixelArray, int width, int height).
+UML design and class responsibilities
+=======================================
 
+(According to the UML diagram in UML.pdf.)
 
+1.1 Package image
 
-------------- ImageSlitter (in package image) -----------------
+Image
+Immutable wrapper around a 2D pixel array.
+Provides getters for width, height and pixels and basic
+read/write operations used by the rest of the code.
 
-The ImageSplitter class is a stateless utility responsible for step 1.4.2.2 of the assignment:
-splitting a padded input image into equal square sub-images according to a given resolution.
+ImagePadder
+Stateless utility that pads an image so that width and height
+become powers of two.
+Uses white pixels for padding and distributes padding
+symmetrically on opposite sides when possible.
 
-The resolution parameter represents the number of sub-images (characters) in each row of the final ASCII output.
-Since the padded image width is guaranteed to be divisible by this value, the splitter computes:
+ImageSplitter
+Stateless utility that splits a padded image into
+square sub-images according to a given resolution.
+Returns an Image[][] where each entry corresponds to
+one sub-image in the original spatial position.
 
-the pixel side length of each square block:
-blockSize = paddedImageWidth / resolution
+ImageBrightnessCalculator
+Computes the average brightness of an Image
+using a fixed luminance formula (weighted RGB).
+Used by the algorithm for all image brightness computations.
 
-the number of block rows:
-numRows = paddedImageHeight / blockSize
+1.2 Package image_char_matching
 
-the number of block columns:
-numCols = resolution
+CharRawBrightness
+Computes a raw brightness value for each character in a given
+charset by rasterizing it to a bitmap and averaging its pixels.
+Stores the results in a static cache so the same character is
+never rasterized twice.
 
-The public API:
+CharBrightness
+Takes the raw brightness map and normalizes it into the range
+[0,1].
+Also supports adding/removing characters and keeps the
+normalized map consistent with the current charset.
 
-Image[][] split(int resolution, Image imageToSplit)
+SubImgCharMatcher
+Holds the current charset and a normalized brightness value
+for every character.
+Given a brightness in [0,1] it returns the character whose
+brightness is closest to that value.
+Also exposes addChar / removeChar so that the shell can
+update the charset dynamically.
 
+1.3 Package ascii_art
 
-The method returns a 2D array of Image objects.
-Each element is a square sub-image of size blockSize × blockSize,
-and the 2D structure preserves the spatial layout of the original image (rows and columns).
-This layout is required in the next stage, where each sub-image is converted into a single ASCII character.
+AsciiArtAlgorithm
+Coordinates the full ASCII-art pipeline for a single run:
 
-The class contains private helper methods for extracting each block,
-keeping the public interface clean and aligned with the Single Responsibility Principle.
-It stores no internal state and does not modify the input image.
+Pads the image via ImagePadder.
 
+Splits the padded image via ImageSplitter.
 
+Uses ImageBrightnessCalculator to compute the brightness
+of every sub-image.
 
+Asks SubImgCharMatcher for the best character for each
+brightness value (with an optional reverse mode).
+Returns a char[][] representing the final ASCII-art image.
+The class also caches the brightness grid of the last
+(image, resolution) pair to avoid recomputing it on
+repeated runs.
 
------------------------- AsciiArtAlgorithm (in package ascii_art) ----------------------------
+Shell
+Interactive command-line shell.
+Responsible for:
 
-AsciiArtAlgorithm design
-The AsciiArtAlgorithm class is responsible for running a single ASCII-art conversion,
-given an Image, a resolution, a charset, and a reverse flag.
-The algorithm pads the image to powers of two using ImagePadder,
-then splits the padded image into square sub-images using ImageSplitter.
-For each sub-image it computes the average brightness with ImageBrightnessCalculator
-(using the same luminance formula everywhere),
-and then asks SubImgCharMatcher to choose the character whose normalized brightness is closest to the
-(possibly reversed) value.
-The result is a char[][] matrix which the Shell later passes to the selected AsciiOutput.
-This design follows composition: the algorithm delegates padding, splitting, brightness calculation,
-and character matching to dedicated helper classes,
-which keeps each class focused and makes the code easy to extend without modifying existing components.
+loading the image
 
+reading commands from the user
 
+managing the current resolution, charset and reverse mode
 
------------------------------------------ Caching and efficiency considerations -----------------------------------
+managing the current output target (console / HTML)
 
-To avoid repeated computations, we added several small caching layers on top of the basic algorithm.
-First, in AsciiArtAlgorithm we maintain a static cache of the brightness grid for the last
-(image, resolution) pair that was processed.
-The helper method getSubImageBrightnessGrid() pads and splits the image and
-computes the average brightness of every sub-image only on the first run.
-Subsequent runs with the same image and resolution
-(for example, when only the charset or the reverse flag change) reuse this double[][]
-instead of recomputing all brightness values.
-This reduces the asymptotic running time of repeated runs from Θ(#pixels) to Θ(#subImages · |charset|),
-at the cost of storing one additional double[][] in memory.
-Second, in CharRawBrightness we use a global static HashMap<Character, Double> as a cache for raw character brightness.
-For every new character we compute its boolean bitmap and brightness at most once;
-all future SubImgCharMatcher instances reuse the cached value.
-This removes an unnecessary Θ(pixelsPerChar) factor from later runs and keeps memory usage linear
-in the number of distinct characters that were ever used.
-Finally, we reuse a single SubImgCharMatcher instance across all runs in the Shell.
-The matcher internally stores both raw and normalized brightness values in maps.
-Normalization is performed only when the charset actually changes (on addChar / removeChar),
-and not on every call to the algorithm.
-This design satisfies the efficiency requirements of section 1.5 while keeping
-the code modular and adhering to the given API.
+creating a new AsciiArtAlgorithm and running it on every
+asciiArt command
+The shell owns a single shared SubImgCharMatcher instance
+and keeps it in sync with the charset.
 
+AsciiArtException
+Custom checked exception used for all user-facing errors
+(invalid command, bad arguments, illegal resolution, etc.).
+The message is printed directly to the user.
 
+KeyboardInput
+Wrapper for reading trimmed lines from standard input.
+Used only by the shell.
 
+1.4 Package ascii_output
 
------------------------------------ Shell and caching usage --------------------------------------
+AsciiOutput (interface)
+Abstracts an output target for ASCII art: defines
+out(char[][]).
 
-The Shell class holds a single SubImgCharMatcher instance as a field and reuses it across all asciiArt runs.
-For every asciiArt command the shell creates a new AsciiArtAlgorithm object,
-passing the shared matcher and the current resolution.
-This design respects the requirement that a fresh algorithm instance is created on each run,
-while still allowing the internal caching mechanisms to be effective:
-the matcher keeps its raw and normalized brightness maps between runs,
-and the algorithm can reuse the cached sub-image brightness grid for the current image and resolution.
-# README – ASCII Art Project
+ConsoleAsciiOutput
+Implementation that prints the char[][] directly
+to standard output.
 
-### Student Information
-- CSE Username: <your_username>
-- ID number: <your_id>
-- Worked in a pair? No / Yes (Name, ID)
+HtmlAsciiOutput
+Implementation that writes the char[][] to an HTML file
+using a monospaced font.
 
----
+Data structures and Java features
+====================================
 
+Below are the main data structures we used, where we used them,
+and why they fit this assignment.
 
+char[][]
+Used in AsciiArtAlgorithm and the output classes as the
+in-memory representation of the final ASCII-art image.
+A 2D array is natural here because the output is a rectangular
+grid and we know its size in advance.
 
-## 1. Class Structure (UML-Level Description)
+Image[][]
+Returned by ImageSplitter.split.
+Represents the tiled sub-images of the padded image,
+preserving the original row/column layout.
+Again, a 2D array is the simplest and most efficient choice
+when dimensions are known.
 
-### ImagePadder (package `image`)
-Responsible for padding an image to the nearest power-of-two dimensions using symmetric white padding.
-Stateless utility performing step 1.4.2.1.
+double[][]
+Used in AsciiArtAlgorithm to store the brightness grid of
+all sub-images.
+It parallels the Image[][] structure and lets us access
+brightness by (row, col) in O(1).
 
-### ImageSplitter (package `image`)
-Splits a padded image into square sub-images according to the given resolution.
-Stateless, used in step 1.4.2.2.
+SortedSet<Character> / TreeSet<Character>
+In Shell we store the current charset in a TreeSet.
+This gives us:
 
-### AsciiArtAlgorithm (package `ascii_art`)
-Coordinates the full ASCII-art process:
-- padding the image
-- splitting into sub-images
-- brightness calculation
-- selecting the closest character using `SubImgCharMatcher`
-Returns `char[][]` representing the ASCII result.
-Uses helper classes via composition.
+uniqueness of characters
 
-### SubImgCharMatcher (package `image_char_matching`)
-Stores and normalizes character brightness values.
-Used by the algorithm to find the best-matching character for each sub-image.
+automatic sorted order when printing the charset
 
-### Shell (package `ascii_art`)
-Handles user interaction, command parsing, resolution changes, charset updates, output mode, and runs the algorithm.
-Stores one shared `SubImgCharMatcher` instance reused between runs.
+reasonable performance for add/remove operations.
+We do not need random indexed access, so a sorted set is a
+good fit.
 
----
+Set<Character> / HashSet<Character>
+Inside SubImgCharMatcher we only need to know whether a
+character is currently in the charset.
+A HashSet provides O(1) average-time add/remove/contains
+and does not impose ordering, which we do not need here.
 
-## 2. Program Flow and Runtime Behavior
+Map<Character, Double> / HashMap
+Used in CharRawBrightness, CharBrightness and
+SubImgCharMatcher to map each character to its (raw or
+normalized) brightness.
+A hash map gives constant-time lookup by character, which is
+exactly what we need when matching brightness values.
 
-During each `asciiArt` command:
-1. The Shell creates a new `AsciiArtAlgorithm` instance with:
-   - the current image
-   - the shared matcher
-   - the current resolution
-2. The algorithm:
-   - pads the image (`ImagePadder`)
-   - splits into sub-images (`ImageSplitter`)
-   - computes brightness values
-   - uses `SubImgCharMatcher` for character selection
-3. The resulting matrix is sent to the selected output (`ConsoleAsciiOutput` or `HtmlAsciiOutput`).
+boolean[][] (inside CharRawBrightness)
+Represents the rasterized bitmap of a single character.
+Using a primitive 2D array is memory efficient and allows
+simple looping when computing brightness.
 
-### Efficiency
-- A brightness grid for `(image, resolution)` is cached inside `AsciiArtAlgorithm`.
-- `CharRawBrightness` caches raw brightness per character globally.
-- `SubImgCharMatcher` normalizes brightness only when the charset changes.
-This reduces repeated work and keeps time complexity low for consecutive runs.
+Primitive arrays and basic types
+For image dimensions, brightness values and loop indices we
+stick to primitives (int, double).
+This keeps the implementation simple and avoids unnecessary
+boxing.
 
----
+Overall, the chosen structures keep the code clear, efficient
+and close to the conceptual model of the problem (grids of
+pixels / characters and maps from characters to brightness).
 
-## 3. Exception Handling
+Exception handling design
+============================
 
-I defined a checked exception `AsciiArtException` for all user-facing errors.
+We used Java’s exception mechanism to centralize all
+user-facing error handling.
 
-Command methods (`handleAdd`, `handleRemove`, `handleRes`, `handleOutput`,
-`handleAsciiArt`, and unknown commands in `executeCommand`) **throw**
-`AsciiArtException` instead of printing errors.
+We defined a custom checked exception AsciiArtException
+for logical input errors in the shell (unknown command,
+bad parameters, illegal resolution, too-small charset, etc.).
 
-All exceptions are **caught only in** `userInputLoop`, which prints
-`e.getMessage()` and continues to the next command, ensuring the shell never exits due to invalid user input.
+Each command handler (handleAdd, handleRemove,
+handleRes, handleOutput, handleAsciiArt, and the
+command dispatcher executeCommand) validates its input.
+When an error is detected, the handler throws an
+AsciiArtException with the exact message required by the
+exercise (for example
+"Did not execute due to incorrect command." or
+"Did not change resolution due to incorrect format.").
 
-Image loading failures (`IOException`) cause `run(String imageName)` to return immediately, as required.
+The main input loop in run wraps the call to
+executeCommand in a try/catch (AsciiArtException e).
+When an exception is caught, the shell prints
+e.getMessage() using System.out.println.
+All error messages are therefore printed from a single place.
 
-### Why exceptions?
-Using exceptions ensures:
-- separation between logic and UI
-- clean control flow (early exit on error)
-- centralized message printing
-- compliance with the assignment requirement to throw errors where they occur and catch them only once
+Errors that are not user input (for example, failing to open
+the image file and throwing IOException) are handled
+separately.
+In that case we simply stop the program without printing a
+user-facing error, as no specific text for this case is
+defined in the instructions.
 
----
+This design keeps the control flow simple: command handlers
+only detect and describe errors, while run is responsible for
+actually printing the messages.
 
-## 4. Use of SubImgCharMatcher API
+Changes to SubImgCharMatcher API
+====================================
 
-The Shell holds a single shared `SubImgCharMatcher` instance.
-Whenever characters are added or removed from the charset (`add`/`remove` commands), the Shell calls:
-- `matcher.addChar(c)`
-- `matcher.removeChar(c)`
+We did not change the signatures of the methods that were
+given in the assignment.
+The matcher still exposes a constructor that receives a charset
+and a method:
 
-This keeps the matcher synchronized with the charset and ensures brightness normalization happens only when needed.
-The same matcher is reused across all ASCII-art runs to avoid recomputing brightness data for previously added characters.
+char getCharByImageBrightness(double brightness)
 
----
+In addition, we added:
 
-## 5. ASCII Output Components Usage
+A default constructor
+SubImgCharMatcher() which initializes the matcher with the
+default charset of digits '0'–'9'.
+This is only a convenience for the shell and does not break
+any existing code, because it adds functionality without
+changing existing signatures.
 
-We used the classes provided in the `ascii_output` package as-is:
-- `AsciiOutput`
-- `ConsoleAsciiOutput`
-- `HtmlAsciiOutput`
+The API still supports adding and removing characters
+dynamically via addChar and removeChar, and these methods
+update the internal brightness maps accordingly.
 
-No modifications were made.
-The Shell simply invokes their public method `out(char[][])` to print the ASCII-art result.
+Changes to supplied code
+===========================
 
----
+We did not modify any of the classes in the provided
+ascii_output package (AsciiOutput, ConsoleAsciiOutput,
+HtmlAsciiOutput).
+The shell uses them exactly as given by calling
+out(char[][]) on the selected output object.
 
+We also did not change the implementation of Image or other
+supplied infrastructure classes.
+All our logic is implemented in new classes or in the stubs we
+were explicitly allowed to complete (Shell,
+AsciiArtAlgorithm, SubImgCharMatcher and the helper
+classes), without altering the behavior of the provided
+components.

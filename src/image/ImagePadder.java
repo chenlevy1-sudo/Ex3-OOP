@@ -28,10 +28,6 @@ public class ImagePadder {
      * @throws IllegalArgumentException if {@code source} is {@code null}
      */
     public Image pad(Image imageToPad) {
-        // TODO: think if should throw exception here
-//        if (imageToPad == null) {
-//            throw new IllegalArgumentException("source image must not be null");
-//        }
 
         int originalWidth = imageToPad.getWidth();
         int originalHeight = imageToPad.getHeight();

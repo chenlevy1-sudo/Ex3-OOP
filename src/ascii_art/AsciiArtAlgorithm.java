@@ -1,12 +1,34 @@
 package ascii_art;
 
-import ascii_output.AsciiOutput;
 import image.Image;
 import image.ImageBrightnessCalculator;
 import image.ImagePadder;
 import image.ImageSplitter;
 import image_char_matching.SubImgCharMatcher;
 
+/**
+ * Core algorithm that converts an {@link Image} into an ASCII-art
+ * representation.
+ * <p>
+ * Given a source image and a desired resolution (number of characters per
+ * row), the algorithm:
+ * <ol>
+ *     <li>pads the image using {@link ImagePadder} so its dimensions are
+ *     suitable for splitting,</li>
+ *     <li>splits the padded image into square sub-images using
+ *     {@link ImageSplitter},</li>
+ *     <li>computes the average brightness of each sub-image via
+ *     {@link ImageBrightnessCalculator},</li>
+ *     <li>matches each brightness value to the closest character using a
+ *     {@link SubImgCharMatcher},</li>
+ *     <li>and returns a 2D {@code char} array representing the final
+ *     ASCII-art image.</li>
+ * </ol>
+ * The algorithm also supports a reverse mode, where brightness values are
+ * complemented (dark areas become light and vice versa), and caches the
+ * sub-image brightness grid for the last (image, resolution) pair in order
+ * to avoid redundant brightness computations across multiple runs.
+ */
 public class AsciiArtAlgorithm {
 
     // constants
@@ -17,7 +39,6 @@ public class AsciiArtAlgorithm {
     private final Image image;
     private final int resolution;  // how many chars in a line
     private boolean reverse;
-    private AsciiOutput output;
 
     // helpers
     private final ImagePadder padder = new ImagePadder();

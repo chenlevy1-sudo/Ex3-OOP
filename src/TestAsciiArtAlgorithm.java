@@ -39,7 +39,7 @@ public class TestAsciiArtAlgorithm {
 
 
         // 4) choose a resolution (number of sub-images per row)
-        int resolution = 512;                           // TODO: you can change this (must be a valid resolution)
+        int resolution = 512;
 
         // 5) create the algorithm instance with the chosen configuration
         AsciiArtAlgorithm algorithm =
